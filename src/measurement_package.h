@@ -1,7 +1,7 @@
 #ifndef MEASUREMENT_PACKAGE_H_
 #define MEASUREMENT_PACKAGE_H_
 
-#include "Eigen/Dense"
+#include "domain_types.h"
 
 class MeasurementPackage {
  public:
@@ -12,7 +12,7 @@ class MeasurementPackage {
 
   long long timestamp_;
 
-  Eigen::VectorXd raw_measurements_;
+  VectorXd raw_measurements_;
 };
 
 #endif // MEASUREMENT_PACKAGE_H_

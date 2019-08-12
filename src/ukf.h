@@ -1,11 +1,13 @@
 #ifndef UKF_H
 #define UKF_H
 
-#include "Eigen/Dense"
+#include <functional>
+#include "domain_types.h"
 #include "measurement_package.h"
 
 class UKF {
  public:
+  using PredictedMeasurementSigmaPointsFunction = std::function<MatrixXd()>;
   /**
    * Constructor
    */
@@ -33,7 +35,7 @@ class UKF {
    * Updates the state and the state covariance matrix using a laser measurement
    * @param meas_package The measurement at k+1
    */
-  void UpdateLidar(MeasurementPackage meas_package);
+  void UpdateLaser(MeasurementPackage meas_package);
 
   /**
    * Updates the state and the state covariance matrix using a radar measurement
@@ -41,6 +43,14 @@ class UKF {
    */
   void UpdateRadar(MeasurementPackage meas_package);
 
+  /**
+   * Common update function
+   * @param meas_package The measurement at k+1
+   * @oaram PredMeasurementSigmaPointsFunction The predicted measurement sigma points create function
+   *
+   */
+  void Update(MeasurementPackage meas_package,
+              const PredictedMeasurementSigmaPointsFunction& PredMeasurementSigmaPointsFunction);
 
   // initially set to false, set to true in first call of ProcessMeasurement
   bool is_initialized_;
@@ -52,13 +62,13 @@ class UKF {
   bool use_radar_;
 
   // state vector: [pos1 pos2 vel_abs yaw_angle yaw_rate] in SI units and rad
-  Eigen::VectorXd x_;
+  VectorXd x_;
 
   // state covariance matrix
-  Eigen::MatrixXd P_;
+  MatrixXd P_;
 
   // predicted sigma points matrix
-  Eigen::MatrixXd Xsig_pred_;
+  MatrixXd Xsig_pred_;
 
   // time when the state is true, in us
   long long time_us_;
@@ -82,10 +92,10 @@ class UKF {
   double std_radphi_;
 
   // Radar measurement noise standard deviation radius change in m/s
-  double std_radrd_ ;
+  double std_radrd_;
 
   // Weights of sigma points
-  Eigen::VectorXd weights_;
+  VectorXd weights_;
 
   // State dimension
   int n_x_;

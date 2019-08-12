@@ -1,5 +1,8 @@
 #include "ukf.h"
+#include <iostream>
 #include "Eigen/Dense"
+#include "tools.h"
+#include "ukf_exception.h"
 
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
@@ -25,7 +28,7 @@ UKF::UKF() {
 
   // Process noise standard deviation yaw acceleration in rad/s^2
   std_yawdd_ = 30;
-  
+
   /**
    * DO NOT MODIFY measurement noise values below.
    * These are provided by the sensor manufacturer.
@@ -45,15 +48,19 @@ UKF::UKF() {
 
   // Radar measurement noise standard deviation radius change in m/s
   std_radrd_ = 0.3;
-  
+
   /**
-   * End DO NOT MODIFY section for measurement noise values 
+   * End DO NOT MODIFY section for measurement noise values
    */
-  
+
   /**
    * TODO: Complete the initialization. See ukf.h for other member properties.
    * Hint: one or more values initialized above might be wildly off...
    */
+  is_initialized_ = false;
+  time_us_ = 0;
+  n_x_ = 5;
+  n_aug_ = 7;
 }
 
 UKF::~UKF() {}
@@ -63,30 +70,116 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
    * TODO: Complete this function! Make sure you switch between lidar and radar
    * measurements.
    */
+  if (!is_initialized_) {
+    x_ = VectorXd::Zero(n_x_);
+    P_ = MatrixXd::Identity(n_x_, n_x_) * 1.0;
+    if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
+      x_ = Tools::TransformRadarMeasurementToState(meas_package.raw_measurements_);
+    } else if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
+      x_ = Tools::TransformLaserMeasurementToState(meas_package.raw_measurements_);
+    } else {
+      throw UKFException("Unknown measurement type");
+    }
+    is_initialized_ = true;
+    time_us_ = meas_package.timestamp_;
+    std::cout << "Initialized X:" << x_.transpose() << std::endl;
+    return;
+  }
+
+  const double& delta_t = static_cast<double>(meas_package.timestamp_ - time_us_) / 1000000.0;
+  Prediction(delta_t);
+
+  if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
+    UpdateLaser(meas_package);
+    time_us_ = meas_package.timestamp_;
+  } else if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
+    UpdateRadar(meas_package);
+    time_us_ = meas_package.timestamp_;
+  } else {
+    throw UKFException("Unknown measurement type");
+  }
 }
 
 void UKF::Prediction(double delta_t) {
   /**
-   * TODO: Complete this function! Estimate the object's location. 
-   * Modify the state vector, x_. Predict sigma points, the state, 
+   * TODO: Complete this function! Estimate the object's location.
+   * Modify the state vector, x_. Predict sigma points, the state,
    * and the state covariance matrix.
    */
+  // Augmente state vector and state Covariance matrix
+  std::cout << "Prediction, delta_t:" << delta_t << std::endl;
+  MatrixXd Paug = MatrixXd::Zero(n_aug_, n_aug_);
+  Paug.topLeftCorner(n_x_, n_x_) = P_;
+  Paug(5, 5) = std::pow(std_a_, 2);
+  Paug(6, 6) = std::pow(std_yawdd_, 2);
+  lambda_ = 3 - n_aug_;
+  MatrixXd Paug_square_toot = Paug.llt().matrixL();
+  VectorXd x_aug = VectorXd::Zero(n_aug_);
+  x_aug.head(n_x_) = x_;
+  x_aug(5) = 0.0;
+  x_aug(6) = 0.0;
+  // Generate augmented sigma points matrix
+  MatrixXd Xsig_aug = Tools::GenerateSigmaPoints(n_aug_, lambda_, Paug_square_toot, x_aug);
+  // Predict augmented sigma points
+  Xsig_pred_ = Tools::PredictSigmaPoints(n_aug_, delta_t, Xsig_aug);
+  // Predict mean
+  weights_ = VectorXd::Zero(2 * n_aug_ + 1);
+  // 1. set weights
+  double weight_0 = lambda_ / (lambda_ + n_aug_);
+  weights_(0) = weight_0;
+  for (int i = 1; i < 2 * n_aug_ + 1; ++i) {  // 2n+1 weights
+    double weight = 0.5 / (n_aug_ + lambda_);
+    weights_(i) = weight;
+  }
+  // 2. predict x mean
+  x_ = Tools::CalculateMeanFromSigmaPoints(Xsig_pred_, weights_);
+  // 3. predict x covariance matrix
+  P_ = Tools::CalculateCovarianceFromSigmaPoints(Xsig_pred_, x_, weights_);
 }
 
-void UKF::UpdateLidar(MeasurementPackage meas_package) {
+void UKF::Update(MeasurementPackage meas_package,
+                 const PredictedMeasurementSigmaPointsFunction& PredMeasurementSigmaPointsFunction) {
+  MatrixXd Zsig = PredMeasurementSigmaPointsFunction();
+  std::cout << "Update:" << 1 << std::endl;
+  VectorXd z_pred = Tools::CalculateMeanFromSigmaPoints(Zsig, weights_);
+  std::cout << "Update:" << 2 << std::endl;
+  MatrixXd S = Tools::CalculateCovarianceFromSigmaPoints(Zsig, z_pred, weights_);
+  std::cout << "Update:" << 3 << std::endl;
+  MatrixXd Tc = Tools::CalculateCrossCorrelationMatrix(n_x_, z_pred.rows(), Zsig, z_pred, Xsig_pred_, x_, weights_);
+  // Kalman gain K;
+  std::cout << "Update:" << 4 << std::endl;
+  MatrixXd K = Tc * S.inverse();
+  std::cout << "Update:" << 5 << std::endl;
+
+  // residual
+  VectorXd z_diff = meas_package.raw_measurements_ - z_pred;
+  std::cout << "Update:" << 6 << std::endl;
+
+  // update state mean and covariance matrix
+  x_ = x_ + K * z_diff;
+  std::cout << "Update:" << 7 << std::endl;
+  P_ = P_ - K * S * K.transpose();
+  std::cout << "Update:" << 8 << std::endl;
+}
+void UKF::UpdateLaser(MeasurementPackage meas_package) {
   /**
-   * TODO: Complete this function! Use lidar data to update the belief 
-   * about the object's position. Modify the state vector, x_, and 
+   * TODO: Complete this function! Use lidar data to update the belief
+   * about the object's position. Modify the state vector, x_, and
    * covariance, P_.
    * You can also calculate the lidar NIS, if desired.
    */
+  std::cout << "UpdateLaser..." << std::endl;
+  Update(meas_package, [&]() { return Tools::TransformPredictedSigmaPointsToLaserMeasurementSpace(Xsig_pred_); });
 }
 
 void UKF::UpdateRadar(MeasurementPackage meas_package) {
   /**
-   * TODO: Complete this function! Use radar data to update the belief 
-   * about the object's position. Modify the state vector, x_, and 
+   * TODO: Complete this function! Use radar data to update the belief
+   * about the object's position. Modify the state vector, x_, and
    * covariance, P_.
    * You can also calculate the radar NIS, if desired.
    */
+  std::cout << "UpdateRadar..." << std::endl;
+  Update(meas_package, [&]() { return Tools::TransformPredictedSigmaPointsToRadarMeasurementSpace(Xsig_pred_); });
+  std::cout << "Finish UpdateRadar..." << std::endl;
 }
