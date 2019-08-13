@@ -1,14 +1,22 @@
 #include <math.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <uWS/uWS.h>
+#include <unistd.h>
 #include <iostream>
 #include "json.hpp"
 #include "tools.h"
 #include "ukf.h"
+#include <fstream>
 
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
 using std::string;
 using std::vector;
+
+UKF *ukf_ptr = nullptr;
+void HandleCtrl_C(int s);
 
 // for convenience
 using json = nlohmann::json;
@@ -33,6 +41,17 @@ int main() {
 
   // Create a Kalman Filter instance
   UKF ukf;
+
+  ukf_ptr = &ukf;
+
+  // hanle Ctrl-C
+  struct sigaction sigIntHandler;
+
+  sigIntHandler.sa_handler = HandleCtrl_C;
+  sigemptyset(&sigIntHandler.sa_mask);
+  sigIntHandler.sa_flags = 0;
+
+  sigaction(SIGINT, &sigIntHandler, NULL);
 
   // used to compute the RMSE later
   Tools tools;
@@ -154,8 +173,8 @@ int main() {
       [&h](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) { std::cout << "Connected!!!" << std::endl; });
 
   h.onDisconnection([&h](uWS::WebSocket<uWS::SERVER> ws, int code, char *message, size_t length) {
-    ws.close();
     std::cout << "Disconnected" << std::endl;
+    ws.close();
   });
 
   int port = 4567;
@@ -167,4 +186,34 @@ int main() {
   }
 
   h.run();
+
+  return 0;
+}
+
+void HandleCtrl_C(int s) {
+  printf("Caught signal %d\n", s);
+  if (ukf_ptr != nullptr) {
+    // analyes NIS
+    unsigned int target_count = 0;
+    std::ofstream nis_file("nis.txt", std::ios::trunc);
+    for (auto nis : ukf_ptr->laser_nis_) {
+      nis_file << "laser_nis:" << nis << std::endl;
+      if (nis > 7.8) {
+        target_count++;
+      }
+    }
+    std::cout << "Laser NIS > 7.8 rate:"
+              << static_cast<double>(target_count) / static_cast<double>(ukf_ptr->laser_nis_.size()) << std::endl;
+    target_count = 0;
+    for (auto nis : ukf_ptr->radar_nis_) {
+      nis_file << "radar_nis:" << nis << std::endl;
+      if (nis > 7.8) {
+        target_count++;
+      }
+    }
+    std::cout << "Radar NIS > 7.8 rate:"
+              << static_cast<double>(target_count) / static_cast<double>(ukf_ptr->radar_nis_.size()) << std::endl;
+    nis_file.close();
+  }
+  exit(1);
 }

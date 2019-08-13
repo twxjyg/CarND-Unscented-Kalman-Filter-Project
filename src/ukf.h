@@ -3,12 +3,15 @@
 
 #include <functional>
 #include "domain_types.h"
+#include <vector>
 #include "measurement_package.h"
 
 class UKF {
  public:
   using PredictedMeasurementSigmaPointsFunction = std::function<MatrixXd()>;
   using MeasurementNoiseCovarianceFunction = std::function<MatrixXd()>;
+  using NISParamCallback =
+      std::function<void(const Eigen::VectorXd& z_pred, const Eigen::VectorXd& z, const Eigen::MatrixXd& S)>;
   /**
    * Constructor
    */
@@ -50,9 +53,8 @@ class UKF {
    * @oaram PredMeasurementSigmaPointsFunction The predicted measurement sigma points create function
    *
    */
-  void Update(MeasurementPackage meas_package,
-              const PredictedMeasurementSigmaPointsFunction& GetZsig,
-              const MeasurementNoiseCovarianceFunction& GetR);
+  void Update(MeasurementPackage meas_package, const PredictedMeasurementSigmaPointsFunction& GetZsig,
+              const MeasurementNoiseCovarianceFunction& GetR, const NISParamCallback& NISParamCallback = nullptr);
 
   // initially set to false, set to true in first call of ProcessMeasurement
   bool is_initialized_;
@@ -107,6 +109,11 @@ class UKF {
 
   // Sigma point spreading parameter
   double lambda_;
+
+  // laser NIS vector
+  std::vector<double> laser_nis_;
+  // radar NIS vector
+  std::vector<double> radar_nis_;
 };
 
 #endif  // UKF_H

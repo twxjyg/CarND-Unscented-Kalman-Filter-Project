@@ -23,11 +23,18 @@ UKF::UKF() {
   // initial covariance matrix
   P_ = MatrixXd::Zero(5, 5);
 
+  /**
+   * accroding to the plotting result under my repo,
+   * all three ploting:(NIS_30_30.png, NIS_10_10.png, NIS_9_3.png) are showing that
+   * my noise parameter is big enough to describe the measurement noise, but
+   * the NIS_9_3 gives me a very good RMSE result, so I think 9 and 3 is enough
+   * for now.
+   */
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 30;
+  std_a_ = 9;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 30;
+  std_yawdd_ = 3;
 
   /**
    * DO NOT MODIFY measurement noise values below.
@@ -137,20 +144,23 @@ void UKF::Prediction(double delta_t) {
   x_ = Tools::CalculateMeanFromSigmaPoints(Xsig_pred_, weights_);
   // 3. predict x covariance matrix
   P_ = Tools::CalculateCovarianceFromSigmaPoints(Xsig_pred_, x_, weights_);
-  std::cout << color::red << "pred x:" << x_.transpose() << color::reset << std::endl;
-  std::cout << color::red << "pred P:" << std::endl << P_.transpose() << color::reset << std::endl;
+  // std::cout << color::red << "pred x:" << x_.transpose() << color::reset << std::endl;
+  // std::cout << color::red << "pred P:" << std::endl << P_.transpose() << color::reset << std::endl;
 }
 
 void UKF::Update(MeasurementPackage meas_package, const PredictedMeasurementSigmaPointsFunction& GetZsig,
-                 const MeasurementNoiseCovarianceFunction& GetR) {
+                 const MeasurementNoiseCovarianceFunction& GetR, const NISParamCallback& NISParamCallback) {
   MatrixXd Zsig = GetZsig();
-  std::cout << color::red << "pred Zsig:" << std::endl << Zsig << color::reset << std::endl;
+  // std::cout << color::red << "pred Zsig:" << std::endl << Zsig << color::reset << std::endl;
   VectorXd z_pred = Tools::CalculateMeanFromSigmaPoints(Zsig, weights_);
-  std::cout << color::red << "pred z:" << z_pred.transpose() << color::reset << std::endl;
+  // std::cout << color::red << "pred z:" << z_pred.transpose() << color::reset << std::endl;
   MatrixXd S = Tools::CalculateCovarianceFromSigmaPoints(Zsig, z_pred, weights_) + GetR();
-  std::cout << color::red << "S:" << std::endl << S << color::reset << std::endl;
+  if (NISParamCallback != nullptr) {
+    NISParamCallback(z_pred, meas_package.raw_measurements_, S);
+  }
+  // std::cout << color::red << "S:" << std::endl << S << color::reset << std::endl;
   MatrixXd Tc = Tools::CalculateCrossCorrelationMatrix(n_x_, z_pred.rows(), Zsig, z_pred, Xsig_pred_, x_, weights_);
-  std::cout << color::magenta << "Tc:" << std::endl << Tc << color::reset << std::endl;
+  // std::cout << color::magenta << "Tc:" << std::endl << Tc << color::reset << std::endl;
   // Kalman gain K;
   MatrixXd K = Tc * S.inverse();
   // residual
@@ -167,10 +177,13 @@ void UKF::UpdateLaser(MeasurementPackage meas_package) {
    * covariance, P_.
    * You can also calculate the lidar NIS, if desired.
    */
-  std::cout << "UpdateLaser..." << std::endl;
   Update(meas_package, [&]() { return Tools::TransformPredictedSigmaPointsToLaserMeasurementSpace(Xsig_pred_); },
-         [&]() { return Tools::MakeLaserNoiseMatrix(std_laspx_, std_laspy_); });
-  std::cout << "Finish UpdateLaser..." << std::endl;
+         [&]() { return Tools::MakeLaserNoiseMatrix(std_laspx_, std_laspy_); },
+         [&](const Eigen::VectorXd& z_pred, const Eigen::VectorXd& z, const Eigen::MatrixXd& S) {
+           const double nis = Tools::CalculateNIS(z_pred, z, S);
+           std::cout << color::green << "Laser NIS:" << nis << color::reset << std::endl;
+           laser_nis_.push_back(nis);
+         });
 }
 
 void UKF::UpdateRadar(MeasurementPackage meas_package) {
@@ -180,8 +193,11 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
    * covariance, P_.
    * You can also calculate the radar NIS, if desired.
    */
-  std::cout << "UpdateRadar..." << std::endl;
   Update(meas_package, [&]() { return Tools::TransformPredictedSigmaPointsToRadarMeasurementSpace(Xsig_pred_); },
-         [&]() { return Tools::MakeRadarNoiseMatrix(std_radr_, std_radphi_, std_radrd_); });
-  std::cout << "Finish UpdateRadar..." << std::endl;
+         [&]() { return Tools::MakeRadarNoiseMatrix(std_radr_, std_radphi_, std_radrd_); },
+         [&](const Eigen::VectorXd& z_pred, const Eigen::VectorXd& z, const Eigen::MatrixXd& S) {
+           const double nis = Tools::CalculateNIS(z_pred, z, S);
+           std::cout << color::green << "Radar NIS:" << nis << color::reset << std::endl;
+           radar_nis_.push_back(nis);
+         });
 }

@@ -89,3 +89,26 @@ for instructions and the project rubric.
 ## How to write a README
 A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
 
+## How to use plot script to show NIS
+
+1. launch simulator
+2. launch UKF executable in a terminal
+
+```bash
+    cd path/to/repo
+    cd build
+    ./UnscentedKF
+```
+3. start simulate by click the button in the simulator
+4. !! press Ctrl-C to stop UKF executable first
+
+    because I will catch the Ctrl-C event and write the NIS log into file
+5. run plot script
+
+```bash
+    ../plot_nis.py
+```
+6. then you will see:
+![NIS_9_3](NIS_9_3.png)
+
+
