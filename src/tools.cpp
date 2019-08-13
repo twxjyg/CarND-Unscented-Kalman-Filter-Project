@@ -141,8 +141,8 @@ MatrixXd Tools::GenerateSigmaPoints(const unsigned int& state_dim, const unsigne
 
   // set remaining sigma points
   for (int i = 0; i < state_dim; ++i) {
-    Xsig.col(i + 1) = state + sqrt(lambda + state_dim) * Psquare_root.col(i);
-    Xsig.col(i + 1 + state_dim) = state - sqrt(lambda + state_dim) * Psquare_root.col(i);
+    Xsig.col(i + 1) = state + std::sqrt(lambda + state_dim) * Psquare_root.col(i);
+    Xsig.col(i + 1 + state_dim) = state - std::sqrt(lambda + state_dim) * Psquare_root.col(i);
   }
   return Xsig;
 }
@@ -266,6 +266,21 @@ MatrixXd Tools::CalculateCrossCorrelationMatrix(const unsigned int& state_dim, c
     Tc = Tc + weights(i) * x_diff * z_diff.transpose();
   }
   return Tc;
+}
+
+MatrixXd Tools::MakeRadarNoiseMatrix(const double& std_radius, const double& std_angle, const double& std_radius_d) {
+  MatrixXd R = MatrixXd::Zero(3, 3);
+  R(0, 0) = std::pow(std_radius, 2);
+  R(1, 1) = std::pow(std_angle, 2);
+  R(2, 2) = std::pow(std_radius_d, 2);
+  return R;
+}
+
+MatrixXd Tools::MakeLaserNoiseMatrix(const double& std_px, const double& std_py) {
+  MatrixXd R = MatrixXd::Zero(2, 2);
+  R(0, 0) = std::pow(std_px, 2);
+  R(1, 1) = std::pow(std_py, 2);
+  return R;
 }
 
 VectorXd Tools::TransformStateToRadarMeasurement(const VectorXd& state) {

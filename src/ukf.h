@@ -8,6 +8,7 @@
 class UKF {
  public:
   using PredictedMeasurementSigmaPointsFunction = std::function<MatrixXd()>;
+  using MeasurementNoiseCovarianceFunction = std::function<MatrixXd()>;
   /**
    * Constructor
    */
@@ -50,7 +51,8 @@ class UKF {
    *
    */
   void Update(MeasurementPackage meas_package,
-              const PredictedMeasurementSigmaPointsFunction& PredMeasurementSigmaPointsFunction);
+              const PredictedMeasurementSigmaPointsFunction& GetZsig,
+              const MeasurementNoiseCovarianceFunction& GetR);
 
   // initially set to false, set to true in first call of ProcessMeasurement
   bool is_initialized_;

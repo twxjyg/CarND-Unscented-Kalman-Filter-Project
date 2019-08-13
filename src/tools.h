@@ -56,10 +56,14 @@ class Tools {
   static MatrixXd TransformPredictedSigmaPointsToRadarMeasurementSpace(const MatrixXd& Xsig_pred);
 
   static MatrixXd TransformPredictedSigmaPointsToLaserMeasurementSpace(const MatrixXd& Xsig_pred);
-  static MatrixXd CalculateCrossCorrelationMatrix(const unsigned int& state_dim,
-                                                  const unsigned int& measurement_dim, const MatrixXd& Zsig,
-                                                  const VectorXd& z_pred, const MatrixXd& Xsig_pred, const VectorXd& x,
+  static MatrixXd CalculateCrossCorrelationMatrix(const unsigned int& state_dim, const unsigned int& measurement_dim,
+                                                  const MatrixXd& Zsig, const VectorXd& z_pred,
+                                                  const MatrixXd& Xsig_pred, const VectorXd& x,
                                                   const VectorXd& weights);
+  static MatrixXd MakeRadarNoiseMatrix(const double& std_radius, const double& std_angle, const double& std_radius_d);
+
+  static MatrixXd MakeLaserNoiseMatrix(const double& std_px, const double& std_py);
+  
   /**
    * A helper method to transform state vector to radar measurement space
    */
