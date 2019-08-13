@@ -97,10 +97,10 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   const double& delta_t = static_cast<double>(meas_package.timestamp_ - time_us_) / 1000000.0;
   Prediction(delta_t);
 
-  if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
+  if (use_laser_ && meas_package.sensor_type_ == MeasurementPackage::LASER) {
     UpdateLaser(meas_package);
     time_us_ = meas_package.timestamp_;
-  } else if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
+  } else if (use_radar_ && meas_package.sensor_type_ == MeasurementPackage::RADAR) {
     UpdateRadar(meas_package);
     time_us_ = meas_package.timestamp_;
   } else {
