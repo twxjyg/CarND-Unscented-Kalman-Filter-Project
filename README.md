@@ -109,6 +109,6 @@ A well written README file can enhance your project and portfolio.  Develop your
     ../plot_nis.py
 ```
 6. then you will see:
-![NIS_9_3](NIS_9_3.png)
+![NIS_9_3](NIS_3_0-9.png)
 
 
