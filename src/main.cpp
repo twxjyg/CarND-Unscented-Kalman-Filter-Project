@@ -4,11 +4,11 @@
 #include <stdlib.h>
 #include <uWS/uWS.h>
 #include <unistd.h>
+#include <fstream>
 #include <iostream>
 #include "json.hpp"
 #include "tools.h"
 #include "ukf.h"
-#include <fstream>
 
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
@@ -125,7 +125,12 @@ int main() {
           ground_truth.push_back(gt_values);
 
           // Call ProcessMeasurement(meas_package) for Kalman filter
-          ukf.ProcessMeasurement(meas_package);
+          try {
+            ukf.ProcessMeasurement(meas_package);
+          } catch (const std::exception &e) {
+            std::cerr << e.what() << std::endl;
+            return;
+          }
 
           // Push the current estimated x,y positon from the Kalman filter's
           //   state vector

@@ -1,6 +1,8 @@
 #include "tools.h"
 #include <iostream>
 
+static constexpr double K_Eps = 0.00001;
+
 VectorXd Tools::CalculateRMSE(const std::vector<VectorXd>& estimations, const std::vector<VectorXd>& ground_truth) {
   /**
    * TODO: Calculate the RMSE here.
@@ -137,18 +139,18 @@ MatrixXd Tools::TransformPredictedSigmaPointsToRadarMeasurementSpace(const Matri
   MatrixXd Zsig = MatrixXd::Zero(3, Xsig_pred.cols());
   for (int i = 0; i < Xsig_pred.cols(); ++i) {  // 2n+1 simga points
     // extract values for better readability
-    double p_x = Xsig_pred(0, i);
-    double p_y = Xsig_pred(1, i);
-    double v = Xsig_pred(2, i);
-    double yaw = Xsig_pred(3, i);
-
-    double v1 = std::cos(yaw) * v;
-    double v2 = std::sin(yaw) * v;
+    const double& p_x = Xsig_pred(0, i);
+    const double& p_y = Xsig_pred(1, i);
+    const double& v = Xsig_pred(2, i);
+    const double& yaw = Xsig_pred(3, i);
+    const double& v1 = std::cos(yaw) * v;
+    const double& v2 = std::sin(yaw) * v;
 
     // measurement model
-    Zsig(0, i) = std::sqrt(p_x * p_x + p_y * p_y);                          // r
-    Zsig(1, i) = std::atan2(p_y, p_x);                                      // phi
-    Zsig(2, i) = (p_x * v1 + p_y * v2) / std::sqrt(p_x * p_x + p_y * p_y);  // r_dot
+    const double& rho = std::sqrt(p_x * p_x + p_y * p_y);
+    Zsig(0, i) = rho;                                         // r
+    Zsig(1, i) = std::atan2(p_y, p_x);                        // phi
+    Zsig(2, i) = (p_x * v1 + p_y * v2) / std::max(K_Eps, rho);  // r_dot
   }
   return Zsig;
 }
